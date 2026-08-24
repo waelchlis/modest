@@ -4,28 +4,30 @@ Handoff note written before a scheduled machine shutdown. Everything described h
 
 ## Where things stand
 
-The server is **built, running, and verified against real EST clients**. 346 automated tests pass, and every row of the status-code table in [03-api-design.md](03-api-design.md) has been exercised by hand against a live instance with `curl` and `openssl`.
+The server is **built, running, and verified against real EST clients**. 432 automated tests pass, and every row of the status-code table in [03-api-design.md](03-api-design.md) is covered both by an automated test and by hand against a live instance with `curl` and `openssl`.
 
 | Epic | State |
 |---|---|
 | 1 — Scaffolding | done |
 | 2 — Codec | done, 146 tests |
 | 3 — Internal CA issuer | done, 121 tests |
-| 4 — Server core, dual listeners, bootstrap endpoints | done |
-| 5 — Enrollment + re-enrollment identity check | done |
+| 4 — Server core, dual listeners, bootstrap endpoints | done, covered by the 86 integration tests |
+| 5 — Enrollment + re-enrollment identity check | done, re-enrollment matrix pinned by test |
 | 6 — HTTP delegated issuer | done, 79 tests |
 | 7 — Docker + Helm | chart done and linting; image build blocked, see below |
 | 8 — README | done |
 
 ```
 git log --oneline
+663dd9a Add HTTP integration tests for the EST server
+c99feaf Add status handoff note
 04f83e7 Add README, Dockerfile and Helm chart
 45cede5 Implement Modest EST server: codec, both issuers, and HTTP surface
 ```
 
 ## What is verified, and how
 
-`dotnet test` — 346 passing across three projects. Beyond that, a real instance was run on two listeners and driven with `openssl`-generated CSRs:
+`dotnet test` — 432 passing across four projects. The 86 server tests drive the real HTTP API over a real Kestrel, and run the enrollment surface against both issuance modes, which is what substantiates the modular-issuance claim. Beyond that, a real instance was run on two listeners and driven with `openssl`-generated CSRs:
 
 - `/cacerts` and enrollment responses parse in real `openssl pkcs7`, and the certs-only writer's output is **byte-identical** to `openssl crl2pkcs7 -nocrl`.
 - Issued certificates chain and validate under `openssl verify`.
@@ -47,7 +49,7 @@ Recorded because several were silent, and the same traps are easy to reintroduce
 
 ## Open items
 
-**In flight.** A background agent was writing `tests/Modest.Server.Tests` — HTTP-level integration tests covering both issuance modes, the full status-code table, and the re-enrollment matrix. It had not reported back before shutdown. **Check whether that directory contains work; if it is empty or the tests do not pass, that suite still needs writing.** This is the one real gap: the server's HTTP layer is verified by hand but not yet by automated tests.
+**One intermittent test failure.** A single server test failed once during a full-solution run, then passed in three consecutive isolated runs and a subsequent full run. It looks like contention when all four test assemblies run concurrently — most likely the port reservation in `ModestServerHarness`, which binds a `TcpListener` to port 0, reads the assigned port and releases it before Kestrel claims it. That window is small but real. Worth closing by retrying on `AddressInUseException`, or by holding the listener until Kestrel is bound. Not a product defect, but it will surface as flake in CI.
 
 **Docker image does not build here.** `dotnet restore` inside the container fails with `NU1301 … UntrustedRoot`. This environment intercepts TLS, and the corporate root is trusted on the host but not inside the image. The Dockerfile is structurally fine; it needs the CA certificate injected into the build stage, or a build on a network without interception. Nothing has confirmed the image runs.
 
