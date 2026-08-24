@@ -1,0 +1,15 @@
+# Delegated issuance: Modest holds no CA key and forwards CSRs to an existing PKI.
+# Install with:
+#   helm install modest ./helm/modest -f ./helm/modest/values-httpdelegate.yaml
+issuance:
+  mode: HttpDelegate
+  httpDelegate:
+    baseAddress: https://ca.internal.example.com/
+    issuePath: /api/v1/issue
+    basicAuthUsername: modest
+    credentialsSecret:
+      existingSecret: modest-upstream
+      passwordKey: password
+    caChain:
+      existingConfigMap: modest-upstream-chain
+      key: chain.pem

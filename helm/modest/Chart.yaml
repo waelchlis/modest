@@ -1,0 +1,11 @@
+apiVersion: v2
+name: modest
+description: Modest — a modular RFC 7030 EST (Enrollment over Secure Transport) server
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - est
+  - rfc7030
+  - pki
+  - certificates

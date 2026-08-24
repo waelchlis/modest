@@ -1,0 +1,10 @@
+# Internal CA: Modest signs with a CA keypair it holds. Suitable for labs and small
+# deployments; a production CA key belongs in an HSM, which this version does not yet support.
+# Install with:
+#   helm install modest ./helm/modest -f ./helm/modest/values-internalca.yaml
+issuance:
+  mode: InternalCa
+  internalCa:
+    existingSecret: modest-ca
+    validityPeriod: "90.00:00:00"
+    minimumRsaKeySizeBits: 2048

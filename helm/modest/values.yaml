@@ -1,0 +1,132 @@
+image:
+  repository: modest
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  # EST is served over TLS and is the only externally reachable port.
+  est:
+    type: ClusterIP
+    port: 8443
+  # Health probes and any internal scraping. Never expose this outside the cluster:
+  # it is plain HTTP by design so probes need no TLS handshake.
+  ops:
+    type: ClusterIP
+    port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# Applied to the pod. The image already runs as non-root; these make it explicit and
+# enforced by the API server rather than trusted from the image.
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+logging:
+  defaultLevel: Information
+  aspNetCoreLevel: Warning
+
+tls:
+  # Secret holding the server's TLS identity. Create it yourself:
+  #   kubectl create secret generic modest-tls \
+  #     --from-file=tls.pfx=./tls.pfx --from-file=tls.pass=./tls.pass
+  # The chart never templates secret values into rendered manifests.
+  existingSecret: modest-tls
+  pfxKey: tls.pfx
+  passwordKey: tls.pass
+
+est:
+  maxRequestBodyBytes: 65536
+
+authentication:
+  allowClientCertificate: true
+  allowHttpBasic: true
+  basicRealm: modest
+
+  # Optional PEM bundle of trust anchors for validating EST client certificates. This is a
+  # different trust domain from the issuing CA: clients often authenticate with certificates
+  # from a pre-existing PKI.
+  clientCertificateTrustStore:
+    existingSecret: ""     # e.g. modest-client-trust
+    key: clients.pem
+
+  # PBKDF2 verifiers, never plaintext. Generate with:
+  #   modest hash-password --username device --password '<pw>'
+  basicCredentials: []
+  # - username: device
+  #   passwordHash: "..."
+  #   salt: "..."
+  #   iterations: 210000
+
+issuance:
+  # InternalCa | HttpDelegate
+  mode: InternalCa
+
+  reenrollment:
+    # Require the client to authenticate with the certificate it is renewing, and to request
+    # exactly the same subject and SANs. Leaving this off turns re-enrollment into an
+    # impersonation endpoint for any holder of any valid certificate.
+    requireMatchingIdentity: true
+
+  internalCa:
+    # Secret holding the CA keypair. Create it yourself:
+    #   kubectl create secret generic modest-ca \
+    #     --from-file=ca.pfx=./ca.pfx --from-file=ca.pfx.pass=./ca.pfx.pass
+    existingSecret: modest-ca
+    pfxKey: ca.pfx
+    passwordKey: ca.pfx.pass
+
+    signatureAlgorithm: SHA256
+    validityPeriod: "90.00:00:00"
+    backdateBy: "00:05:00"
+    minimumRsaKeySizeBits: 2048
+    allowRsa: true
+    allowEllipticCurve: true
+    allowedEllipticCurves: ["nistP256", "nistP384", "nistP521"]
+    enhancedKeyUsageOids: ["1.3.6.1.5.5.7.3.2"]   # clientAuth
+    keyUsages: ["DigitalSignature", "KeyEncipherment"]
+    copySubjectAlternativeNames: true
+    requireSubjectOrSan: true
+
+  httpDelegate:
+    baseAddress: ""
+    issuePath: /api/v1/issue
+    timeoutSeconds: 30
+    maxRetryAttempts: 3
+    maxCsrSizeBytes: 16384
+
+    basicAuthUsername: ""
+    # Secret holding the upstream Basic auth password.
+    #   kubectl create secret generic modest-upstream --from-file=password=./password
+    credentialsSecret:
+      existingSecret: ""
+      passwordKey: password
+
+    # PEM chain published from /cacerts. Statically configured because /cacerts must answer a
+    # client that has never enrolled — the bootstrap case — which a cache of past issuance
+    # responses cannot do.
+    caChain:
+      existingConfigMap: ""
+      key: chain.pem
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

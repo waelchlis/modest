@@ -1,0 +1,35 @@
+Modest is installed as {{ include "modest.fullname" . }}, running in {{ .Values.issuance.mode }} mode.
+
+EST endpoints (TLS, port {{ .Values.service.est.port }}):
+  https://<host>/.well-known/est/cacerts        GET   no auth, for bootstrapping trust
+  https://<host>/.well-known/est/csrattrs       GET   no auth, returns 204
+  https://<host>/.well-known/est/simpleenroll   POST  client cert or HTTP Basic
+  https://<host>/.well-known/est/simplereenroll POST  client cert (see note below)
+
+Health (plain HTTP, port {{ .Values.service.ops.port }}, cluster-internal only):
+  /healthz  liveness
+  /readyz   readiness
+
+Fetch the CA chain to confirm the deployment is serving:
+
+  kubectl port-forward svc/{{ include "modest.fullname" . }} {{ .Values.service.est.port }}
+  curl -sk https://127.0.0.1:{{ .Values.service.est.port }}/.well-known/est/cacerts \
+    | base64 -d | openssl pkcs7 -inform DER -print_certs -noout
+
+{{ if .Values.issuance.reenrollment.requireMatchingIdentity -}}
+Re-enrollment identity checking is ON. Clients must authenticate with the certificate they are
+renewing and request exactly the same subject and SANs. Basic-authenticated re-enrollment is
+refused, because there is no certificate to establish continuity with.
+{{- else -}}
+WARNING: issuance.reenrollment.requireMatchingIdentity is FALSE. Any client holding any valid
+credential can re-enroll under another party's identity. Turn this on unless you have a specific
+reason not to.
+{{- end }}
+
+{{ if not .Values.authentication.basicCredentials -}}
+{{ if .Values.authentication.allowHttpBasic -}}
+Note: HTTP Basic is enabled but no credentials are configured, so only TLS client certificate
+authentication can currently succeed. Generate a verifier with:
+  modest hash-password --username <user> --password '<password>'
+{{- end }}
+{{- end }}

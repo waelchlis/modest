@@ -1,0 +1,33 @@
+{{- /* Two Services, matching the server's two listeners. The ops service is deliberately
+       ClusterIP-only: it is plain HTTP and must never be reachable from outside the cluster. */ -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "modest.fullname" . }}
+  labels:
+    {{- include "modest.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.est.type }}
+  ports:
+    - port: {{ .Values.service.est.port }}
+      targetPort: est
+      protocol: TCP
+      name: est
+  selector:
+    {{- include "modest.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "modest.fullname" . }}-ops
+  labels:
+    {{- include "modest.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.ops.port }}
+      targetPort: ops
+      protocol: TCP
+      name: ops
+  selector:
+    {{- include "modest.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,89 @@
+{{- /*
+Non-secret configuration only. Secrets are referenced by name from Secret resources the
+operator creates out of band, never templated into rendered output.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "modest.fullname" . }}
+  labels:
+    {{- include "modest.labels" . | nindent 4 }}
+data:
+  appsettings.Production.json: |
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": {{ .Values.logging.defaultLevel | quote }},
+          "Microsoft.AspNetCore": {{ .Values.logging.aspNetCoreLevel | quote }}
+        }
+      },
+      "Kestrel": {
+        "Est": {
+          "Port": {{ .Values.service.est.port }},
+          "CertificatePath": "/etc/modest/tls/{{ .Values.tls.pfxKey }}",
+          "CertificatePasswordFile": "/etc/modest/tls/{{ .Values.tls.passwordKey }}"
+        },
+        "Ops": {
+          "Port": {{ .Values.service.ops.port }}
+        }
+      },
+      "Est": {
+        "MaxRequestBodyBytes": {{ .Values.est.maxRequestBodyBytes }}
+      },
+      "Authentication": {
+        "AllowClientCertificate": {{ .Values.authentication.allowClientCertificate }},
+        "AllowHttpBasic": {{ .Values.authentication.allowHttpBasic }},
+        "BasicRealm": {{ .Values.authentication.basicRealm | quote }},
+        {{- if .Values.authentication.clientCertificateTrustStore.existingSecret }}
+        "ClientCertificateTrustStorePath": "/etc/modest/client-trust/{{ .Values.authentication.clientCertificateTrustStore.key }}",
+        {{- end }}
+        "BasicCredentials": [
+          {{- range $i, $c := .Values.authentication.basicCredentials }}
+          {{- if $i }},{{ end }}
+          {
+            "Username": {{ $c.username | quote }},
+            "PasswordHash": {{ $c.passwordHash | quote }},
+            "Salt": {{ $c.salt | quote }},
+            "Iterations": {{ default 210000 $c.iterations }}
+          }
+          {{- end }}
+        ]
+      },
+      "Issuance": {
+        "Mode": {{ .Values.issuance.mode | quote }},
+        "Reenrollment": {
+          "RequireMatchingIdentity": {{ .Values.issuance.reenrollment.requireMatchingIdentity }}
+        },
+        {{- with .Values.issuance.internalCa }}
+        "InternalCa": {
+          "CertificatePath": "/etc/modest/ca/{{ .pfxKey }}",
+          "CertificatePasswordFile": "/etc/modest/ca/{{ .passwordKey }}",
+          "SignatureAlgorithm": {{ .signatureAlgorithm | quote }},
+          "ValidityPeriod": {{ .validityPeriod | quote }},
+          "BackdateBy": {{ .backdateBy | quote }},
+          "MinimumRsaKeySizeBits": {{ .minimumRsaKeySizeBits }},
+          "AllowRsa": {{ .allowRsa }},
+          "AllowEllipticCurve": {{ .allowEllipticCurve }},
+          "AllowedEllipticCurves": {{ toJson .allowedEllipticCurves }},
+          "EnhancedKeyUsageOids": {{ toJson .enhancedKeyUsageOids }},
+          "KeyUsages": {{ toJson .keyUsages }},
+          "CopySubjectAlternativeNames": {{ .copySubjectAlternativeNames }},
+          "RequireSubjectOrSan": {{ .requireSubjectOrSan }}
+        },
+        {{- end }}
+        {{- with .Values.issuance.httpDelegate }}
+        "HttpDelegate": {
+          "BaseAddress": {{ .baseAddress | quote }},
+          "IssuePath": {{ .issuePath | quote }},
+          "TimeoutSeconds": {{ .timeoutSeconds }},
+          "MaxRetryAttempts": {{ .maxRetryAttempts }},
+          "MaxCsrSizeBytes": {{ .maxCsrSizeBytes }},
+          "BasicAuthUsername": {{ .basicAuthUsername | quote }},
+          {{- if .credentialsSecret.existingSecret }}
+          "BasicAuthPasswordFile": "/etc/modest/upstream/{{ .credentialsSecret.passwordKey }}",
+          {{- end }}
+          "StaticCaChainPath": "/etc/modest/upstream-chain/{{ .caChain.key }}"
+        }
+        {{- end }}
+      }
+    }

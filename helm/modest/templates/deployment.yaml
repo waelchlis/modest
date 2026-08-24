@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "modest.fullname" . }}
+  labels:
+    {{- include "modest.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "modest.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Roll the pods when configuration changes; without this a ConfigMap edit is invisible
+        # to a running Deployment.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "modest.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: modest
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+          ports:
+            - name: est
+              containerPort: {{ .Values.service.est.port }}
+              protocol: TCP
+            - name: ops
+              containerPort: {{ .Values.service.ops.port }}
+              protocol: TCP
+          # Probes target the ops port, which is plain HTTP. This is the entire reason the server
+          # runs two listeners: the kubelet gets to check health without a TLS handshake or client
+          # certificate negotiation.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: ops
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: ops
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/appsettings.Production.json
+              subPath: appsettings.Production.json
+              readOnly: true
+            - name: tls
+              mountPath: /etc/modest/tls
+              readOnly: true
+            {{- if eq .Values.issuance.mode "InternalCa" }}
+            - name: ca
+              mountPath: /etc/modest/ca
+              readOnly: true
+            {{- end }}
+            {{- if eq .Values.issuance.mode "HttpDelegate" }}
+            {{- if .Values.issuance.httpDelegate.credentialsSecret.existingSecret }}
+            - name: upstream
+              mountPath: /etc/modest/upstream
+              readOnly: true
+            {{- end }}
+            - name: upstream-chain
+              mountPath: /etc/modest/upstream-chain
+              readOnly: true
+            {{- end }}
+            {{- if .Values.authentication.clientCertificateTrustStore.existingSecret }}
+            - name: client-trust
+              mountPath: /etc/modest/client-trust
+              readOnly: true
+            {{- end }}
+            # readOnlyRootFilesystem is on, so anything the runtime wants to write needs a volume.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "modest.fullname" . }}
+        - name: tls
+          secret:
+            secretName: {{ required "tls.existingSecret is required: create the Secret holding the server TLS identity" .Values.tls.existingSecret }}
+            defaultMode: 0400
+        {{- if eq .Values.issuance.mode "InternalCa" }}
+        - name: ca
+          secret:
+            secretName: {{ required "issuance.internalCa.existingSecret is required in InternalCa mode" .Values.issuance.internalCa.existingSecret }}
+            defaultMode: 0400
+        {{- end }}
+        {{- if eq .Values.issuance.mode "HttpDelegate" }}
+        {{- if .Values.issuance.httpDelegate.credentialsSecret.existingSecret }}
+        - name: upstream
+          secret:
+            secretName: {{ .Values.issuance.httpDelegate.credentialsSecret.existingSecret }}
+            defaultMode: 0400
+        {{- end }}
+        - name: upstream-chain
+          configMap:
+            name: {{ required "issuance.httpDelegate.caChain.existingConfigMap is required in HttpDelegate mode: /cacerts must answer before any enrollment has happened" .Values.issuance.httpDelegate.caChain.existingConfigMap }}
+        {{- end }}
+        {{- if .Values.authentication.clientCertificateTrustStore.existingSecret }}
+        - name: client-trust
+          secret:
+            secretName: {{ .Values.authentication.clientCertificateTrustStore.existingSecret }}
+            defaultMode: 0400
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
