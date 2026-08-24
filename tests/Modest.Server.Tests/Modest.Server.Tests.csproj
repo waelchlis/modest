@@ -3,6 +3,8 @@
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
+    <!-- Test names read as sentences; CA1707 wants them to read as identifiers. -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
