@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Modest.Core/Modest.Core.csproj" />
+    <ProjectReference Include="../../src/Modest.Codec/Modest.Codec.csproj" />
+  </ItemGroup>
+
+</Project>

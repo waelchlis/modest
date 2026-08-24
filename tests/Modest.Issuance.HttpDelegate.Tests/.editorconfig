@@ -1,0 +1,5 @@
+[*.cs]
+# Test names read as sentences here; underscores are the point.
+dotnet_diagnostic.CA1707.severity = none
+# Inline literal arrays in assertions are clearer than hoisted static fields.
+dotnet_diagnostic.CA1861.severity = none

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>modest</AssemblyName>
+    <RootNamespace>Modest.Tooling</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Modest.Core/Modest.Core.csproj" />
+    <ProjectReference Include="../Modest.Codec/Modest.Codec.csproj" />
+  </ItemGroup>
+
+</Project>

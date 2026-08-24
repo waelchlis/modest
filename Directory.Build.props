@@ -1,0 +1,23 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Security and reliability analyzer categories are errors: this is a PKI codebase. -->
+    <WarningsAsErrors>$(WarningsAsErrors);CA2100;CA2300;CA2301;CA2302;CA2305;CA2310;CA2311;CA2312;CA2315;CA2321;CA2322;CA2326;CA2327;CA2328;CA2329;CA2330;CA5350;CA5351;CA5359;CA5360;CA5361;CA5362;CA5363;CA5364;CA5365;CA5366;CA5368;CA5369;CA5370;CA5371;CA5372;CA5373;CA5374;CA5375;CA5376;CA5377;CA5378;CA5379;CA5380;CA5381;CA5382;CA5383;CA5384;CA5385;CA5386;CA5387;CA5388;CA5389;CA5390;CA5391;CA5392;CA5393;CA5394;CA5395;CA5396;CA5397;CA5398;CA5399;CA5400;CA5401;CA5402;CA5403</WarningsAsErrors>
+    <NoWarn>$(NoWarn);CA1848;CA1515;CA1812</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <IsPackable>false</IsPackable>
+    <AnalysisMode>Default</AnalysisMode>
+  </PropertyGroup>
+
+</Project>

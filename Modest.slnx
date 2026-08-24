@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Modest.Codec/Modest.Codec.csproj" />
+    <Project Path="src/Modest.Core/Modest.Core.csproj" />
+    <Project Path="src/Modest.Issuance.HttpDelegate/Modest.Issuance.HttpDelegate.csproj" />
+    <Project Path="src/Modest.Issuance.InternalCa/Modest.Issuance.InternalCa.csproj" />
+    <Project Path="src/Modest.Server/Modest.Server.csproj" />
+    <Project Path="src/Modest.Tooling/Modest.Tooling.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Modest.Codec.Tests/Modest.Codec.Tests.csproj" />
+    <Project Path="tests/Modest.Issuance.HttpDelegate.Tests/Modest.Issuance.HttpDelegate.Tests.csproj" />
+    <Project Path="tests/Modest.Issuance.InternalCa.Tests/Modest.Issuance.InternalCa.Tests.csproj" />
+    <Project Path="tests/Modest.Rfc7030.ComplianceTests/Modest.Rfc7030.ComplianceTests.csproj" />
+    <Project Path="tests/Modest.Server.Tests/Modest.Server.Tests.csproj" />
+    <Project Path="tests/Modest.TestSupport/Modest.TestSupport.csproj" />
+  </Folder>
+</Solution>

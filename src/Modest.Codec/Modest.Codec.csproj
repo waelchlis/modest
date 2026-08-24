@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Modest.Core/Modest.Core.csproj" />
+  </ItemGroup>
+
+</Project>
