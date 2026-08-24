@@ -60,7 +60,7 @@ Recorded because several were silent, and the same traps are easy to reintroduce
 
 ## Next steps, in order
 
-1. Check the state of `tests/Modest.Server.Tests`; finish it if incomplete. This is the highest-value remaining work.
+1. Close the port-reservation race in `ModestServerHarness` so the server suite does not flake under CI parallelism.
 2. Add the RFC 7030 compliance test project with `[Trait("Rfc7030Section", …)]` traceability.
 3. Add the CI workflow: build, format check, test, and the `openssl` interop job.
 4. Resolve the container build (inject the proxy root, or build elsewhere) and smoke-test the image.
