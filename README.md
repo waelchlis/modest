@@ -105,7 +105,7 @@ place, ready for the next renewal.
 Set `Issuance:Mode` to `HttpDelegate` and point it at your API. Modest sends:
 
 ```json
-{ "CSR": "<base64 of the PEM-encoded PKCS#10 request>" }
+{ "CSR": "-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----\n" }
 ```
 
 and expects back:
