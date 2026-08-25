@@ -100,6 +100,12 @@ curl -sk --cert dev-cert.pem --key dev.key -X POST https://127.0.0.1:8443/.well-
 The response is the same certs-only PKCS#7 shape as `/simpleenroll`. `dev-cert.pem` is overwritten in
 place, ready for the next renewal.
 
+[scripts/modest-client.sh](scripts/modest-client.sh) wraps that same renewal flow — PKCS#12 or
+separate PEM cert/key in, either format out, plus a `cacerts` command for trust bootstrap.
+[scripts/modest-client-keytool.sh](scripts/modest-client-keytool.sh) does the PKCS#12-to-PKCS#12
+case the same way but with Java's `keytool` instead of `openssl`, for renewing a keystore in place
+with its alias and password untouched. See [scripts/README.md](scripts/README.md).
+
 ## Quickstart — HTTP delegated issuance
 
 Set `Issuance:Mode` to `HttpDelegate` and point it at your API. Modest sends:
