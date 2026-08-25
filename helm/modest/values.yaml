@@ -65,6 +65,9 @@ tls:
   # The chart never templates secret values into rendered manifests.
   existingSecret: modest-tls
   pfxKey: tls.pfx
+  # Set to "" for a PFX with no password (Modest's loader accepts one — see ModestHost.cs's
+  # LoadServerCertificate). Doing so omits Kestrel:Est:CertificatePasswordFile from the rendered
+  # config entirely, so the Secret above then only needs the tls.pfx key.
   passwordKey: tls.pass
 
 est:

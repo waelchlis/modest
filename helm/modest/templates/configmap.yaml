@@ -20,8 +20,8 @@ data:
       "Kestrel": {
         "Est": {
           "Port": {{ .Values.service.est.port }},
-          "CertificatePath": "/etc/modest/tls/{{ .Values.tls.pfxKey }}",
-          "CertificatePasswordFile": "/etc/modest/tls/{{ .Values.tls.passwordKey }}"
+          "CertificatePath": "/etc/modest/tls/{{ .Values.tls.pfxKey }}"{{ if .Values.tls.passwordKey }},
+          "CertificatePasswordFile": "/etc/modest/tls/{{ .Values.tls.passwordKey }}"{{ end }}
         },
         "Ops": {
           "Port": {{ .Values.service.ops.port }}

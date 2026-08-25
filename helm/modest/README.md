@@ -12,6 +12,15 @@ The chart never creates Secrets or templates secret values into rendered manifes
 kubectl create secret generic modest-tls --from-file=tls.pfx=./tls.pfx --from-file=tls.pass=./tls.pass
 ```
 
+If `tls.pfx` has no password, set `tls.passwordKey: ""` in values and create the Secret with just the
+PFX — Modest's certificate loader accepts an unencrypted PKCS#12 file, and the chart then omits
+`Kestrel:Est:CertificatePasswordFile` from the rendered config entirely instead of pointing it at a
+file that doesn't exist:
+
+```bash
+kubectl create secret generic modest-tls --from-file=tls.pfx=./tls.pfx
+```
+
 **Internal CA mode** — the CA keypair:
 
 ```bash
