@@ -20,6 +20,9 @@ The server is **built, running, and verified against real EST clients, a real Do
 
 ```
 git log --oneline
+b99df25 Allow a configurable loadBalancerIP for the EST Service, pin pod UID/GID
+3651669 Fix Docker build, fix Helm secret permissions, resolve CSR PEM contract
+8439723 Close the harness port race, add RFC 7030 traceability, wire up CI
 6fa9792 Correct a stale next step in the status note
 bbf8009 Update status: server integration tests landed, 432 passing
 663dd9a Add HTTP integration tests for the EST server
@@ -27,6 +30,9 @@ c99feaf Add status handoff note
 04f83e7 Add README, Dockerfile and Helm chart
 45cede5 Implement Modest EST server: codec, both issuers, and HTTP surface
 ```
+
+Pushed to `main` on https://github.com/waelchlis/modest (public); CI is green there — see item 8 under
+[Progress](#progress-on-2026-08-25).
 
 ## What is verified, and how
 
@@ -155,13 +161,32 @@ Recorded because several were silent, and the same traps are easy to reintroduce
    doesn't escape `+`" regression test unwinnable through real CSR content under the new contract; it
    was rewritten to explain why rather than deleted outright.
 
+7. **Helm: configurable `loadBalancerIP`, explicit `runAsUser`/`runAsGroup`.** `service.est.loadBalancerIP`
+   added to [values.yaml](../helm/modest/values.yaml), templated into the EST `Service` only when set
+   (`{{- with }}`, so `type: ClusterIP` deployments render unchanged). `podSecurityContext` now also
+   pins `runAsUser`/`runAsGroup: 1654` alongside the existing `fsGroup` — same UID the image already
+   defaults to, just enforced by the API server rather than only trusted from the image. Verified with
+   `helm lint`/`helm template` (both value files, and `--set service.est.type=LoadBalancer
+   --set service.est.loadBalancerIP=...`); not re-run against a live cluster since it reuses the
+   `fsGroup` mechanism already proven in item 5 and doesn't change the effective runtime identity.
+
+8. **Pushed to GitHub, CI confirmed green.** Created `waelchlis/modest` (public) with `gh repo create`,
+   pushed as `main` (the workflow triggers on `main`; the local default was still `master` from `git
+   init`, renamed and the old branch deleted from the remote), and watched the run —
+   `Build, format, test` and `OpenSSL interop` both passed. Epic 1's Definition of Done ("CI is green")
+   is now actually confirmed, not just locally simulated: https://github.com/waelchlis/modest/actions
+
 ## Open items
 
-**CI has never actually run.** The workflow file is written and its steps are individually verified locally, but with no GitHub remote configured, nothing has triggered it — "CI is green" is unconfirmed. This needs the user to point at (or create) a real GitHub remote; not something to do unilaterally.
+None outstanding from this handoff. Everything in "Not started" and "Next steps" as of 2026-08-24 has
+been implemented and verified above.
 
-## Next steps, in order
+## Next steps
 
-1. Push to a GitHub remote (none is configured yet) and confirm the workflow actually goes green there.
+Nothing blocking. Natural follow-ups if picked back up: a branch-protection rule requiring the CI
+checks before merge, and eventually resolving the roadmap items already tracked in
+[08-roadmap.md](08-roadmap.md) (channel binding, `/csrattrs` content, multi-CA labels, etc.) rather
+than anything left over from this handoff.
 
 ## Running it locally
 
