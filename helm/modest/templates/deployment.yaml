@@ -20,6 +20,9 @@ spec:
         {{- end }}
       labels:
         {{- include "modest.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -32,6 +35,12 @@ spec:
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: Production
+            {{- if and (eq .Values.issuance.mode "HttpDelegate") .Values.issuance.httpDelegate.upstreamTrustStore.existingConfigMap }}
+            # Adds to, rather than replaces, the image's normal trust store — see the comment on
+            # issuance.httpDelegate.upstreamTrustStore in values.yaml.
+            - name: SSL_CERT_FILE
+              value: /etc/modest/upstream-trust/{{ .Values.issuance.httpDelegate.upstreamTrustStore.key }}
+            {{- end }}
           ports:
             - name: est
               containerPort: {{ .Values.service.est.port }}
@@ -78,6 +87,11 @@ spec:
             - name: upstream-chain
               mountPath: /etc/modest/upstream-chain
               readOnly: true
+            {{- if .Values.issuance.httpDelegate.upstreamTrustStore.existingConfigMap }}
+            - name: upstream-trust
+              mountPath: /etc/modest/upstream-trust
+              readOnly: true
+            {{- end }}
             {{- end }}
             {{- if .Values.authentication.clientCertificateTrustStore.existingSecret }}
             - name: client-trust
@@ -120,6 +134,11 @@ spec:
         - name: upstream-chain
           configMap:
             name: {{ required "issuance.httpDelegate.caChain.existingConfigMap is required in HttpDelegate mode: /cacerts must answer before any enrollment has happened" .Values.issuance.httpDelegate.caChain.existingConfigMap }}
+        {{- if .Values.issuance.httpDelegate.upstreamTrustStore.existingConfigMap }}
+        - name: upstream-trust
+          configMap:
+            name: {{ .Values.issuance.httpDelegate.upstreamTrustStore.existingConfigMap }}
+        {{- end }}
         {{- end }}
         {{- if .Values.authentication.clientCertificateTrustStore.existingSecret }}
         - name: client-trust
