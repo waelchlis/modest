@@ -1,0 +1,79 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch/PR makes the previous run's results moot.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build, format, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Modest.slnx
+
+      - name: Build
+        run: dotnet build Modest.slnx --no-restore --configuration Release
+
+      - name: Format check
+        run: dotnet format Modest.slnx --no-restore --verify-no-changes
+
+      # The openssl interop suite (Modest.Codec.Tests, [Trait("Category", "OpenSslInterop")]) is
+      # excluded here and run as its own job below — see 06-testing-strategy.md §7. Everything else,
+      # including the RFC 7030 compliance project, runs together.
+      - name: Test
+        run: >
+          dotnet test Modest.slnx --no-build --configuration Release
+          --filter "Category!=OpenSslInterop"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage
+          retention-days: 14
+
+  openssl-interop:
+    name: OpenSSL interop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # This job's entire point is proving the codec agrees with an independent implementation, not
+      # just with itself (see OpenSslInteropTests.cs). If the runner has no openssl, that claim goes
+      # untested silently unless this fails loudly first.
+      - name: Confirm openssl is on PATH
+        run: openssl version
+
+      - name: Restore
+        run: dotnet restore tests/Modest.Codec.Tests/Modest.Codec.Tests.csproj
+
+      - name: Build
+        run: >
+          dotnet build tests/Modest.Codec.Tests/Modest.Codec.Tests.csproj
+          --no-restore --configuration Release
+
+      - name: Run interop tests
+        run: >
+          dotnet test tests/Modest.Codec.Tests/Modest.Codec.Tests.csproj
+          --no-build --configuration Release
+          --filter "Category=OpenSslInterop"

@@ -13,6 +13,7 @@ namespace Modest.Codec.Tests;
 /// Each test returns early when openssl is not on PATH, so a machine without it still runs a green
 /// suite — at the cost of losing this coverage, which is why CI is expected to provide openssl.
 /// </remarks>
+[Trait("Category", "OpenSslInterop")]
 public sealed class OpenSslInteropTests : IDisposable
 {
     private readonly TestCertificateAuthority _ca = TestCertificateAuthority.CreateWithIntermediate();

@@ -10,11 +10,21 @@ namespace Modest.Server.Tests;
 /// The EST protocol surface, exercised over real HTTPS against a real host.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Every test here is inherited by one concrete class per issuance mode. That is the whole claim of
 /// the modular-issuance design: the wire behaviour of the protocol layer — status codes, media types,
 /// authentication, proof-of-possession — must not depend on which issuer is registered. Running the
 /// suite once against the internal CA would leave that claim untested, and a protocol-layer
 /// regression that only showed up in delegated mode would ship.
+/// </para>
+/// <para>
+/// <c>Rfc7030Section</c> traits point at the numbered section of
+/// <see href="../../planning/01-rfc7030-reference.md">01-rfc7030-reference.md</see> a test
+/// substantiates (that doc's own numbering, not the RFC's) — filterable with
+/// <c>dotnet test --filter Rfc7030Section=5</c>. This is the traceability matrix
+/// <see href="../../planning/06-testing-strategy.md">06-testing-strategy.md</see> §6 asks for; see
+/// <c>Modest.Rfc7030.ComplianceTests</c> for the tests that do not fit naturally here.
+/// </para>
 /// </remarks>
 public abstract class EstEndpointTestsBase
 {
@@ -34,6 +44,7 @@ public abstract class EstEndpointTestsBase
     // ---------------------------------------------------------------- /cacerts
 
     [Fact]
+    [Trait("Rfc7030Section", "2")]
     public async Task Cacerts_serves_the_configured_chain_without_any_credentials()
     {
         using HttpResponseMessage response = await Harness.GetEstAsync(CaCertsPath);
@@ -50,6 +61,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Cacerts_ignores_credentials_it_is_given()
     {
         // Bootstrap operations are unauthenticated, not "authenticated when convenient": a client
@@ -63,6 +75,7 @@ public abstract class EstEndpointTestsBase
     // --------------------------------------------------------------- /csrattrs
 
     [Fact]
+    [Trait("Rfc7030Section", "3")]
     public async Task Csrattrs_returns_204_with_an_empty_body_and_no_authentication()
     {
         using HttpResponseMessage response = await Harness.GetEstAsync(CsrAttrsPath);
@@ -74,6 +87,7 @@ public abstract class EstEndpointTestsBase
     // ----------------------------------------------------------- authentication
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simpleenroll_without_credentials_returns_401_and_challenges_for_basic()
     {
         using HttpResponseMessage response = await PostCsrAsync(EnrollPath, NewCsr(), authorization: null);
@@ -83,6 +97,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simplereenroll_without_credentials_returns_401_and_challenges_for_basic()
     {
         using HttpResponseMessage response = await PostCsrAsync(ReenrollPath, NewCsr(), authorization: null);
@@ -92,6 +107,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simpleenroll_with_the_wrong_password_returns_401()
     {
         string header = ModestServerHarness.BasicHeader(
@@ -103,6 +119,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simpleenroll_with_an_unknown_username_returns_401()
     {
         string header = ModestServerHarness.BasicHeader("nobody", ModestServerHarness.BasicPassword);
@@ -118,6 +135,7 @@ public abstract class EstEndpointTestsBase
     [InlineData("Basic not-base64!!")]
     [InlineData("Basic dXNlcm5hbWUtd2l0aC1uby1jb2xvbg==")] // decodes, but has no ':' separator
     [InlineData("nonsense")]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simpleenroll_with_a_malformed_authorization_header_returns_401(string header)
     {
         using HttpResponseMessage response = await PostCsrAsync(EnrollPath, NewCsr(), header);
@@ -126,6 +144,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simpleenroll_with_a_non_basic_scheme_returns_401()
     {
         // A bearer token is not an EST credential no matter how well formed it is; accepting one
@@ -139,6 +158,7 @@ public abstract class EstEndpointTestsBase
     // ------------------------------------------------------------- happy paths
 
     [Fact]
+    [Trait("Rfc7030Section", "2")]
     public async Task Simpleenroll_with_valid_basic_credentials_issues_a_certificate_for_the_submitted_key()
     {
         byte[] csrDer = CsrFactory.CreateRsa("CN=basic-enrolled.example.com");
@@ -153,6 +173,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simpleenroll_with_a_tls_client_certificate_and_no_authorization_header_issues_a_certificate()
     {
         using X509Certificate2 clientCertificate = TestPki.Ca.IssueLeaf("CN=cert-enrolled.example.com");
@@ -166,6 +187,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "3")]
     public async Task Simpleenroll_success_body_is_base64_text_and_survives_line_wrapping_on_the_way_in()
     {
         // Some EST clients wrap their request at 64 characters like classic PEM and some send one
@@ -189,6 +211,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "3")]
     public async Task Simpleenroll_accepts_a_content_type_carrying_parameters()
     {
         using HttpResponseMessage response = await Harness.PostEstAsync(
@@ -203,6 +226,8 @@ public abstract class EstEndpointTestsBase
     // ----------------------------------------------------------- error mapping
 
     [Fact]
+    [Trait("Rfc7030Section", "3")]
+    [Trait("Rfc7030Section", "8")]
     public async Task Simpleenroll_with_the_wrong_content_type_returns_415()
     {
         using HttpResponseMessage response = await Harness.PostEstAsync(
@@ -215,6 +240,8 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "3")]
+    [Trait("Rfc7030Section", "8")]
     public async Task Simpleenroll_without_a_content_type_returns_415()
     {
         using HttpResponseMessage response = await Harness.PostEstAsync(
@@ -227,6 +254,8 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "3")]
+    [Trait("Rfc7030Section", "8")]
     public async Task Simpleenroll_with_a_body_that_is_not_base64_returns_400()
     {
         using HttpResponseMessage response = await PostCsrAsync(
@@ -236,6 +265,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "8")]
     public async Task Simpleenroll_with_base64_that_is_not_a_csr_returns_400()
     {
         string body = Convert.ToBase64String("hello, this decodes cleanly and means nothing"u8.ToArray());
@@ -247,6 +277,8 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "6")]
+    [Trait("Rfc7030Section", "8")]
     public async Task Simpleenroll_with_a_tampered_csr_signature_returns_400()
     {
         // Proof-of-possession. The DER still parses; only the signature no longer matches the
@@ -260,6 +292,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "8")]
     public async Task Simpleenroll_with_an_empty_body_returns_400()
     {
         using HttpResponseMessage response =
@@ -280,6 +313,7 @@ public abstract class EstEndpointTestsBase
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "5")]
     public async Task Simpleenroll_checks_credentials_before_it_looks_at_the_body()
     {
         // An unauthenticated caller must not be able to learn anything about parsing or size limits.

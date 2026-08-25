@@ -3,6 +3,8 @@
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
+    <!-- Test names read as sentences; CA1707 wants them to read as identifiers. -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +25,16 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Modest.Server/Modest.Server.csproj" />
     <ProjectReference Include="../Modest.TestSupport/Modest.TestSupport.csproj" />
+
+    <!--
+      Reuses ModestServerHarness/TestPki/EstResponse rather than re-implementing a second real-Kestrel
+      test host: those fixtures are exactly what this project also needs (see 06-testing-strategy.md
+      §6 — "largely the same tests as §5 above, re-tagged"), and the wire-level assertions that already
+      run through them in Modest.Server.Tests are the traceability evidence for most RFC sections. The
+      Rfc7030Section trait on those tests is what makes them queryable as part of this matrix; what's
+      added here is only what doesn't fit naturally as an endpoint-behaviour test.
+    -->
+    <ProjectReference Include="../Modest.Server.Tests/Modest.Server.Tests.csproj" />
   </ItemGroup>
 
 </Project>

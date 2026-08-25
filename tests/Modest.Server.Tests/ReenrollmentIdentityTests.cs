@@ -17,6 +17,7 @@ namespace Modest.Server.Tests;
 /// of true.
 /// </remarks>
 [Collection(InternalCaHost.Name)]
+[Trait("Rfc7030Section", "5")]
 public sealed class ReenrollmentIdentityTests(InternalCaFixture fixture)
 {
     private const string ReenrollPath = EstUriPaths.Prefix + EstUriPaths.SimpleReenroll;

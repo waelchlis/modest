@@ -144,43 +144,66 @@ public sealed class ModestServerHarness : IAsyncDisposable
 
         try
         {
-            int estPort = ReserveFreePort();
-            int opsPort = ReserveFreePort();
-
-            Dictionary<string, string?> settings =
-                BuildConfiguration(options, tempPath, upstream, estPort, opsPort);
-
-            var logs = new CapturingLoggerProvider();
-
-            // ContentRootPath points at an empty scratch directory so the host does not pick up the
-            // appsettings.json that the Modest.Server project reference drops into the test output.
-            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            // Reserving a port means binding it and releasing it again (see ReserveFreePort), which
+            // leaves a window between the release and Kestrel's own bind where something else --
+            // most plausibly another instance of this same harness, starting concurrently in a
+            // parallel test run -- can claim the port first. Kestrel then fails to start with an
+            // address-in-use error. Rather than closing that window (not possible without either
+            // holding the socket, which would just make Kestrel fail the same way, or serialising
+            // every harness in the suite), retry the whole reserve-and-start sequence a few times.
+            const int maxAttempts = 5;
+            for (int attempt = 1; ; attempt++)
             {
-                ContentRootPath = tempPath,
-                EnvironmentName = Environments.Production,
-                ApplicationName = typeof(ModestHost).Assembly.GetName().Name,
-            });
+                int estPort = ReserveFreePort();
+                int opsPort = ReserveFreePort();
 
-            builder.Configuration.AddInMemoryCollection(settings);
+                Dictionary<string, string?> settings =
+                    BuildConfiguration(options, tempPath, upstream, estPort, opsPort);
 
-            builder.Logging.ClearProviders();
-            builder.Logging.AddProvider(logs);
-            builder.Logging.SetMinimumLevel(LogLevel.Debug);
+                var logs = new CapturingLoggerProvider();
 
-            ModestHost.ConfigureServices(builder);
+                // ContentRootPath points at an empty scratch directory so the host does not pick up
+                // the appsettings.json that the Modest.Server project reference drops into the test
+                // output.
+                var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+                {
+                    ContentRootPath = tempPath,
+                    EnvironmentName = Environments.Production,
+                    ApplicationName = typeof(ModestHost).Assembly.GetName().Name,
+                });
 
-            if (options.IssuerOverride is not null)
-            {
-                // Registered after ConfigureServices, so the last registration is the one resolved.
-                builder.Services.AddSingleton(options.IssuerOverride);
+                builder.Configuration.AddInMemoryCollection(settings);
+
+                builder.Logging.ClearProviders();
+                builder.Logging.AddProvider(logs);
+                builder.Logging.SetMinimumLevel(LogLevel.Debug);
+
+                ModestHost.ConfigureServices(builder);
+
+                if (options.IssuerOverride is not null)
+                {
+                    // Registered after ConfigureServices, so the last registration is the one resolved.
+                    builder.Services.AddSingleton(options.IssuerOverride);
+                }
+
+                ModestHost.ConfigureKestrel(builder);
+
+                WebApplication app = ModestHost.BuildApp(builder);
+
+                try
+                {
+                    await app.StartAsync().ConfigureAwait(false);
+                    return new ModestServerHarness(app, options, upstream, logs, tempPath, estPort, opsPort);
+                }
+                catch (IOException) when (attempt < maxAttempts)
+                {
+                    await app.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (SocketException) when (attempt < maxAttempts)
+                {
+                    await app.DisposeAsync().ConfigureAwait(false);
+                }
             }
-
-            ModestHost.ConfigureKestrel(builder);
-
-            WebApplication app = ModestHost.BuildApp(builder);
-            await app.StartAsync().ConfigureAwait(false);
-
-            return new ModestServerHarness(app, options, upstream, logs, tempPath, estPort, opsPort);
         }
         catch
         {

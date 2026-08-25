@@ -15,6 +15,7 @@ namespace Modest.Server.Tests;
 /// need to know that doing so actually disables it — and, just as importantly, that it disables only
 /// this check and not authentication along with it.
 /// </remarks>
+[Trait("Rfc7030Section", "5")]
 public sealed class ReenrollmentCheckDisabledTests : IAsyncLifetime
 {
     private const string ReenrollPath = EstUriPaths.Prefix + EstUriPaths.SimpleReenroll;

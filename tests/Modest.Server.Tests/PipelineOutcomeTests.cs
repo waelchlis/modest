@@ -48,6 +48,7 @@ public sealed class PipelineOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "7")]
     public async Task A_pending_issuance_becomes_202_with_a_retry_after_and_no_body()
     {
         using HttpResponseMessage response = await EnrollAgainstAsync(_pending);
@@ -60,6 +61,7 @@ public sealed class PipelineOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "8")]
     public async Task An_unexpected_failure_becomes_500_without_leaking_the_reason()
     {
         using HttpResponseMessage response = await EnrollAgainstAsync(_faulty);
@@ -82,6 +84,7 @@ public sealed class PipelineOutcomeTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Rfc7030Section", "8")]
     public async Task An_unexpected_failure_on_cacerts_is_a_500_with_a_generic_body()
     {
         using HttpResponseMessage response =
