@@ -41,6 +41,18 @@ kubectl create configmap modest-upstream-chain --from-file=chain.pem=./chain.pem
 
 The chain is a ConfigMap rather than a Secret because it holds only public certificates.
 
+If the upstream issuance API's TLS certificate doesn't chain to a publicly trusted CA — an internal
+PKI, for example — set `issuance.httpDelegate.upstreamTrustStore.existingConfigMap` and create a
+ConfigMap with the extra trust anchor(s):
+
+```bash
+kubectl create configmap modest-upstream-trust --from-file=ca.pem=./upstream-ca.pem
+```
+
+This is wired through the `SSL_CERT_FILE` environment variable, which *adds* to the image's normal
+trust store rather than replacing it — the public CAs still work too. Leave it unset if the upstream
+is already publicly trusted.
+
 ## Installing
 
 ```bash

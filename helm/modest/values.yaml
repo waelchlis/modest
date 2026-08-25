@@ -144,7 +144,25 @@ issuance:
       existingConfigMap: ""
       key: chain.pem
 
+    # Optional PEM bundle of extra trust anchors for validating the upstream issuance API's TLS
+    # certificate (e.g. a private/internal CA). Modest has no dedicated trust-store setting for
+    # this — it's wired through the SSL_CERT_FILE environment variable, which .NET's OpenSSL-backed
+    # TLS stack on Linux honours directly and *adds* to the image's normal trust store rather than
+    # replacing it (verified against both a private CA and a real public site). A ConfigMap, not a
+    # Secret, because it only holds public certificates — same reasoning as caChain above. Leave
+    # existingConfigMap empty if the upstream's certificate already chains to a publicly trusted CA.
+    upstreamTrustStore:
+      existingConfigMap: ""    # e.g. modest-upstream-trust
+      key: ca.pem
+
 nodeSelector: {}
 tolerations: []
 affinity: {}
 podAnnotations: {}
+# Merged into the pod template's labels alongside the chart's own selector labels (rendered after
+# them, so a colliding key wins here) — additive, not a replacement. Do not set
+# app.kubernetes.io/name or app.kubernetes.io/instance here: the Deployment's spec.selector is fixed
+# to the chart's own values, and overriding either on the pod template would make the ReplicaSet
+# unable to adopt its own pods. Useful for things like a service mesh's injection label or an
+# internal cost-allocation tag.
+podLabels: {}
