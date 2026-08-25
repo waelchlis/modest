@@ -8,6 +8,9 @@ metadata:
     {{- include "modest.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.est.type }}
+  {{- with .Values.service.est.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
   ports:
     - port: {{ .Values.service.est.port }}
       targetPort: est

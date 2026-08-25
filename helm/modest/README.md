@@ -63,6 +63,8 @@ See [values.yaml](values.yaml), which is commented throughout. The settings most
 | `authentication.basicCredentials` | PBKDF2 verifiers from `modest hash-password`, never plaintext |
 | `authentication.clientCertificateTrustStore.existingSecret` | trust anchors for client certificates; falls back to the platform store |
 | `issuance.internalCa.allowedEllipticCurves` | narrowing this genuinely narrows it |
+| `service.est.type` | `ClusterIP` by default; set to `LoadBalancer` to expose EST outside the cluster |
+| `service.est.loadBalancerIP` | only meaningful with `type: LoadBalancer`; requests a specific address from the cloud provider (support varies) — left empty, the provider assigns one |
 
 `helm install` prints usage notes, and warns if re-enrollment identity checking is disabled or if Basic auth is enabled with no credentials configured.
 

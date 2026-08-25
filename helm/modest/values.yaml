@@ -13,6 +13,9 @@ service:
   est:
     type: ClusterIP
     port: 8443
+    # Only meaningful when type is LoadBalancer, and only honoured by cloud providers that support
+    # requesting a specific address (most do; some ignore it). Left empty, the provider assigns one.
+    loadBalancerIP: ""
   # Health probes and any internal scraping. Never expose this outside the cluster:
   # it is plain HTTP by design so probes need no TLS handshake.
   ops:
@@ -28,14 +31,21 @@ resources:
 
 # Applied to the pod. The image already runs as non-root; these make it explicit and
 # enforced by the API server rather than trusted from the image.
+#
+# runAsUser/runAsGroup/fsGroup are all 1654: the uid:gid of the "app" user baked into the .NET
+# chiselled image by docker/Dockerfile's `USER $APP_UID`. Pinning runAsUser/runAsGroup here isn't
+# strictly required for the image to work (it already runs as that user by default), but it makes
+# the identity explicit and enforced by the API server rather than trusted from the image, and it
+# keeps this value next to fsGroup, which is required. All three must move together if the base
+# image ever changes.
 podSecurityContext:
   runAsNonRoot: true
+  runAsUser: 1654
+  runAsGroup: 1654
   seccompProfile:
     type: RuntimeDefault
   # Secret volumes are mounted owned by root with this as the group; without it, the container's
-  # non-root process (uid 1654, the "app" user baked into the .NET chiselled image by
-  # docker/Dockerfile's `USER $APP_UID`) cannot read the TLS/CA secrets at all, and the pod
-  # crash-loops on startup. Must match that image's UID:GID if the base image ever changes.
+  # non-root process cannot read the TLS/CA secrets at all, and the pod crash-loops on startup.
   fsGroup: 1654
 
 securityContext:
