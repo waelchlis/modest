@@ -41,7 +41,9 @@ just the renewed leaf, with no chain and none of `openssl pkcs7 -print_certs`' o
 `subject=`/`issuer=` lines ahead of it. There is no `--out-key`: a renewal doesn't change the key, so
 the `--key`/`--pkcs12` file you already have is still the right one. For `--out-pkcs12`, the
 container's password defaults to whatever password the input `--pkcs12` used — the same protection
-just carries forward — unless `--out-pkcs12-password` gives an explicit new one.
+just carries forward — unless `--out-pkcs12-password` gives an explicit new one. Likewise, the
+output container's friendly name (`-name`) matches the input `--pkcs12`'s own friendly name if it
+had one; falls back to `modest-renewed` when the input had none, or wasn't a PKCS#12 at all.
 
 ## Fetching the CA chain
 

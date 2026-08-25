@@ -233,7 +233,7 @@ run_cacerts() {
 # ------------------------------------------------------------------------------------------ renew
 
 materialize_input_identity() {
-    local cert_pem="$workdir/in-cert.pem" key_pem="$workdir/in-key.pem"
+    local cert_pem="$workdir/in-cert.pem" key_pem="$workdir/in-key.pem" friendly_name=""
 
     if [[ -n "$in_pkcs12" ]]; then
         [[ -z "$in_cert" && -z "$in_key" ]] || die "--pkcs12 cannot be combined with --cert/--key"
@@ -257,6 +257,12 @@ materialize_input_identity() {
             || die "could not read the client certificate from --pkcs12: $(cat "$workdir/pkcs12-cert.err")"
         [[ -s "$key_pem" ]] || die "--pkcs12 contained no private key"
         [[ -s "$cert_pem" ]] || die "--pkcs12 contained no client certificate (a bag of CA certs alone isn't enough)"
+
+        # Not every PKCS#12 carries a friendlyName (openssl only emits the bag attribute line when
+        # one is set), so an input file built without -name legitimately yields an empty value here
+        # — falls through to write_pkcs12_output's own default rather than inventing one.
+        friendly_name=$(openssl pkcs12 -in "$in_pkcs12" -nodes -passin "$passin" -info 2>/dev/null \
+            | grep -m1 -E '^[[:space:]]*friendlyName:' | sed -E 's/^[[:space:]]*friendlyName:[[:space:]]*//')
     elif [[ -n "$in_cert" || -n "$in_key" ]]; then
         [[ -n "$in_cert" && -n "$in_key" ]] || die "--cert and --key must be given together"
         [[ -f "$in_cert" ]] || die "--cert file not found: $in_cert"
@@ -270,7 +276,7 @@ materialize_input_identity() {
     fi
 
     chmod 600 "$key_pem"
-    echo "$cert_pem:$key_pem"
+    echo "$cert_pem:$key_pem:$friendly_name"
 }
 
 validate_output_selection() {
@@ -299,7 +305,7 @@ build_renewal_csr() {
 }
 
 write_pkcs12_output() {
-    local chain_pem=$1 key_pem=$2
+    local chain_pem=$1 key_pem=$2 friendly_name=${3:-modest-renewed}
 
     # The container's password defaults to whatever password the input --pkcs12 used, not a fresh
     # empty one — a renewal is meant to carry the same protection forward, not silently weaken it.
@@ -316,7 +322,7 @@ write_pkcs12_output() {
     fi
 
     openssl pkcs12 -export -in "$chain_pem" -inkey "$key_pem" -out "$out_pkcs12" \
-        -passout "$passout" -name "modest-renewed" \
+        -passout "$passout" -name "$friendly_name" \
         || die "could not build the output PKCS#12 container"
 
     echo "Wrote renewed certificate and key to ${out_pkcs12} (PKCS#12)"
@@ -336,10 +342,9 @@ write_pem_output() {
 run_renew() {
     validate_output_selection
 
-    local identity cert_pem key_pem
+    local identity cert_pem key_pem friendly_name
     identity=$(materialize_input_identity)
-    cert_pem=${identity%%:*}
-    key_pem=${identity##*:}
+    IFS=: read -r cert_pem key_pem friendly_name <<< "$identity"
 
     local csr_pem
     csr_pem=$(build_renewal_csr "$cert_pem" "$key_pem")
@@ -361,7 +366,7 @@ run_renew() {
     leaf_pem_from_chain "$chain_pem" "$leaf_pem"
 
     if [[ -n "$out_pkcs12" ]]; then
-        write_pkcs12_output "$chain_pem" "$key_pem"
+        write_pkcs12_output "$chain_pem" "$key_pem" "$friendly_name"
     else
         write_pem_output "$leaf_pem"
     fi
