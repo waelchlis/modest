@@ -32,10 +32,10 @@ Returns the configured chain: the CA cert itself plus any configured intermediat
 
 Request (`POST {BaseAddress}{IssuePath}`):
 ```json
-{ "CSR": "<base64 of the raw DER PKCS#10 bytes>" }
+{ "CSR": "<base64 of the PEM-encoded PKCS#10 request>" }
 ```
 
-This is **the exact same base64 string EST clients send** in the `/simpleenroll` body is *not* reused verbatim (that body may contain whitespace/line-wraps and uses `Content-Transfer-Encoding: base64` framing) — Modest re-encodes the already-decoded raw DER bytes into a clean, unwrapped base64 string for this outgoing request. This is called out explicitly because it's a place a naive implementation could pass through the wrong bytes; see [09-open-questions.md](09-open-questions.md) for confirming this interpretation of "base64 CSR string" against the user's actual upstream API if it turns out to expect PEM-wrapped-then-base64'd or something else.
+Confirmed against the real upstream (see [09-open-questions.md](09-open-questions.md) #1): the field is base64 of the *PEM text* — `-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----\n`, itself base64 — not base64 of the raw DER underneath it. The EST client's own `/simpleenroll` body is *not* reused verbatim (that body may contain whitespace/line-wraps and uses `Content-Transfer-Encoding: base64` framing) — Modest re-encodes the already-decoded DER bytes to a fresh, canonically-wrapped PEM and base64s that, so the upstream always sees one canonical form regardless of what the EST client sent.
 
 Expected response (`200 OK`, `application/json`):
 ```json

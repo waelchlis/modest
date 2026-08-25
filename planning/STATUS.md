@@ -4,7 +4,7 @@ Updated after resuming from the [2026-08-24 handoff](#progress-on-2026-08-25) be
 
 ## Where things stand
 
-The server is **built, running, and verified against real EST clients**. 438 automated tests pass, and every row of the status-code table in [03-api-design.md](03-api-design.md) is covered both by an automated test and by hand against a live instance with `curl` and `openssl`.
+The server is **built, running, and verified against real EST clients, a real Docker image, and a real Kubernetes deployment**. 438 automated tests pass, and every row of the status-code table in [03-api-design.md](03-api-design.md) is covered both by an automated test and by hand against a live instance with `curl` and `openssl`.
 
 | Epic | State |
 |---|---|
@@ -14,7 +14,7 @@ The server is **built, running, and verified against real EST clients**. 438 aut
 | 4 — Server core, dual listeners, bootstrap endpoints | done, covered by the 86 integration tests |
 | 5 — Enrollment + re-enrollment identity check | done, re-enrollment matrix pinned by test |
 | 6 — HTTP delegated issuer | done, 79 tests |
-| 7 — Docker + Helm | chart done and linting; image build blocked, see below |
+| 7 — Docker + Helm | done — image builds and runs, chart installs and serves on a real cluster, see below |
 | 8 — README | done |
 | RFC 7030 compliance test project | done, 6 tests + traits on 38 existing tests, see below |
 
@@ -38,6 +38,8 @@ c99feaf Add status handoff note
 - Re-enrollment identity checking blocks subject impersonation and SAN escalation, and refuses Basic-authenticated re-enrollment.
 - ECDSA enrollment works on P-256 and P-384.
 - Listener isolation holds: EST routes 404 on the ops port, health routes 404 on the EST port.
+
+The same checks were repeated against the actual Docker image and a real `helm install` on a local cluster (minikube) — see items 4 and 5 under [Progress](#progress-on-2026-08-25): `/healthz`/`/readyz` 200, `/cacerts` parses and chains, a full `openssl`-CSR enrollment round-trip issues a certificate for the submitted key, and listener isolation holds through the cluster Service too.
 
 ## Defects found by testing and fixed
 
@@ -92,20 +94,74 @@ Recorded because several were silent, and the same traps are easy to reintroduce
    configured for this repo yet, so the workflow has not actually executed on GitHub — that's the
    condition on "CI is green" in epic 1's Definition of Done that remains unconfirmed.
 
+4. **Docker build fixed — two separate bugs, both real.** `docker build` reproduced the `NU1301 …
+   UntrustedRoot` failure from the previous session, but that turned out not to be the only problem:
+
+   - **No `.dockerignore` existed.** `COPY src/ src/` was copying the *host's* already-restored
+     `src/**/obj/` directories (with `project.assets.json` pointing at the host's NuGet cache paths)
+     straight over the build stage's freshly-restored ones, so `dotnet publish --no-restore`
+     immediately failed with `NETSDK1064: Package ... was not found` even once the TLS trust was
+     fixed — a package that genuinely was in the container's NuGet cache, just shadowed by the
+     clobbered assets file. Root-caused by exec'ing into the intermediate build-stage image and
+     diffing what `dotnet restore` actually wrote against what `COPY src/ src/` left behind. Added
+     [.dockerignore](../.dockerignore) (`**/bin/`, `**/obj/`, plus `tests/`/`planning/`/etc., which the
+     Dockerfile never references and don't belong in the build context regardless).
+   - **The TLS-interception problem was real too.** Added [docker/ca-certificates/](../docker/ca-certificates/)
+     (empty except `.gitkeep`/`README.md`, gitignored otherwise — never a repo default, since baking
+     one network's interception CA into the image would silently make every build trust it) and a
+     `COPY` + `update-ca-certificates` step in the build stage before `dotnet restore`, per that
+     directory's README.
+
+   With both fixed, `docker build` succeeds, and the image was smoke-tested end to end: generated a
+   CA + TLS cert + Basic credential with the tooling image, ran the container, and drove it with real
+   `openssl`/`curl` — `/healthz`/`/readyz` 200, `/cacerts` parses in `openssl pkcs7`, a full
+   enrollment round-trip issues a certificate for the submitted key, and listener isolation holds.
+   Image built and torn down; nothing persists from this beyond the Dockerfile/`.dockerignore`
+   changes.
+
+5. **`helm install` run against a real cluster — found and fixed a genuine deploy-breaking bug.**
+   `minikube` (docker driver), image loaded with `minikube image load`, chart installed with
+   `values-internalca.yaml` plus real `modest-tls`/`modest-ca` Secrets. Both replicas
+   **crash-looped**: `UnauthorizedAccessException: Access to the path '/etc/modest/tls/tls.pass' is
+   denied`. Cause: Kubernetes Secret volumes are owned by root regardless of the container's runtime
+   user; the chart's pod never set `fsGroup`, so the non-root process the image runs as (`uid 1654`,
+   the chiselled base image's `USER $APP_UID`) had no path to read them — `defaultMode: 0400` was also
+   owner-only, so even a matching group wouldn't have helped. Fixed in
+   [helm/modest/values.yaml](../helm/modest/values.yaml) (`podSecurityContext.fsGroup: 1654`, documented
+   as needing to match the base image if that ever changes) and
+   [helm/modest/templates/deployment.yaml](../helm/modest/templates/deployment.yaml) (all four Secret
+   volumes `0400` → `0440`). Re-templated, re-installed: both replicas ready, and the same `openssl`
+   enroll-and-verify smoke test that ran against the bare Docker image was repeated through the
+   cluster's `Service` (port-forwarded) with identical results, plus listener isolation confirmed
+   through the two separate `Service` objects (`modest-modest` for EST, `modest-modest-ops` for
+   health). `helm lint`/`template` alone never had a way to catch this — it's a runtime permissions
+   fault, not a templating one. Cluster and image deleted afterward (`minikube delete`); nothing
+   persists beyond the two chart files.
+
+6. **Open contract question #1 resolved.** The contradictory answer in
+   [09-open-questions.md](09-open-questions.md) #1 ("raw DER... base64" vs. "with the corresponding
+   BEGIN headers") was put back to the user rather than guessed at, since it governs wire
+   compatibility with a real external system nothing here can verify against. Reconfirmed: the
+   upstream expects **base64 of PEM text**, not base64 of the raw DER. Changed in
+   `HttpDelegateIssuer.IssueAsync` (`PemEncoding.WriteString("CERTIFICATE REQUEST", ...)` before the
+   outer base64), with matching updates to the outbound-contract tests, `FakeUpstreamCa` (the
+   server-level stub upstream, which was decoding the field as raw DER and would otherwise have
+   started failing every delegated-mode integration test), and the contract's documentation in
+   [03-api-design.md](03-api-design.md), [04-issuance-providers.md](04-issuance-providers.md), and the
+   [README](../README.md). One incidental finding worth recording: base64-of-PEM-text can *never*
+   contain `+` or `/` in its output, for any input — every byte in PEM's character set has its
+   high bit(s) constrained in a way that makes it mathematically impossible for any of the four
+   base64 output symbols per input triplet to land on 62/63. That made the existing "JSON encoder
+   doesn't escape `+`" regression test unwinnable through real CSR content under the new contract; it
+   was rewritten to explain why rather than deleted outright.
+
 ## Open items
 
-**Docker image does not build here.** `dotnet restore` inside the container fails with `NU1301 … UntrustedRoot`. This environment intercepts TLS, and the corporate root is trusted on the host but not inside the image. The Dockerfile is structurally fine; it needs the CA certificate injected into the build stage, or a build on a network without interception. Nothing has confirmed the image runs.
-
-**CI has never actually run.** The workflow file is written and its steps are individually verified locally, but with no GitHub remote configured, nothing has triggered it — "CI is green" is unconfirmed.
-
-**Not started.**
-- No `helm install` against a real cluster; only `lint` and `template`.
+**CI has never actually run.** The workflow file is written and its steps are individually verified locally, but with no GitHub remote configured, nothing has triggered it — "CI is green" is unconfirmed. This needs the user to point at (or create) a real GitHub remote; not something to do unilaterally.
 
 ## Next steps, in order
 
 1. Push to a GitHub remote (none is configured yet) and confirm the workflow actually goes green there.
-2. Resolve the container build (inject the proxy root, or build elsewhere) and smoke-test the image.
-3. Confirm the one outstanding contract question in [09-open-questions.md](09-open-questions.md) #1 — the answer said "raw DER base64" but also mentioned `-----BEGIN` headers, which are contradictory. Built to the raw-DER reading, which matches the JSON contract as originally specified. If the real upstream wants PEM, it is a one-line change in `HttpDelegateIssuer.IssueAsync`.
 
 ## Running it locally
 

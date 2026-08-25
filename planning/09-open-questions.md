@@ -6,7 +6,9 @@ This plan makes a number of reasonable default decisions so a concrete design co
 
 1. **CSR encoding in the outbound `{"CSR": "..."}` field**: assumed to be base64 of the *raw DER* PKCS#10 bytes (re-encoded cleanly from what the EST client sent, not passed through verbatim with its original line-wraps). Is this correct, or does the upstream API expect base64-of-PEM (i.e. base64 the ASCII `-----BEGIN CERTIFICATE REQUEST-----...` text itself)? This changes one encoding step in `Modest.Issuance.HttpDelegate` — worth nailing down against the actual upstream API's expectations before Phase 5.
 
-Answer: yes that's correct, raw DER PKCS#10 bytes encoded in base64 with the corresponding --- BEGIN... headers 
+Answer: yes that's correct, raw DER PKCS#10 bytes encoded in base64 with the corresponding --- BEGIN... headers
+
+**Resolved 2026-08-25**: that answer was self-contradictory as written — "raw DER... base64" (no PEM markers) versus "with the corresponding BEGIN headers" (PEM) describe two different encodings. Reconfirmed directly: the upstream expects **base64 of PEM text** (`-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----\n`, itself base64'd), not base64 of the raw DER. `HttpDelegateIssuer.IssueAsync` now builds the field via `PemEncoding.WriteString("CERTIFICATE REQUEST", ...)` before the outer base64 encode. Updated everywhere this contract is documented: [03-api-design.md](03-api-design.md), [04-issuance-providers.md](04-issuance-providers.md), [README.md](../README.md).
 
 2. **`issuer` field ordering**: assumed to be one or more concatenated PEM certs, intermediate(s) first then root (or intermediate-only, root distributed separately) — does the actual upstream API guarantee an order, and does it ever include the leaf certificate itself in this field (some APIs redundantly do)?
 

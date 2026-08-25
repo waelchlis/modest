@@ -62,7 +62,7 @@ curl -sk https://127.0.0.1:8443/.well-known/est/cacerts | base64 -d | openssl pk
 Set `Issuance:Mode` to `HttpDelegate` and point it at your API. Modest sends:
 
 ```json
-{ "CSR": "<base64 of the raw DER PKCS#10, unwrapped>" }
+{ "CSR": "<base64 of the PEM-encoded PKCS#10 request>" }
 ```
 
 and expects back:

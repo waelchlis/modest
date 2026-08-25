@@ -94,19 +94,28 @@ spec:
         - name: tls
           secret:
             secretName: {{ required "tls.existingSecret is required: create the Secret holding the server TLS identity" .Values.tls.existingSecret }}
-            defaultMode: 0400
+            # Group-readable, not just owner-readable: the mounted files are owned by root, and
+            # it's group membership via podSecurityContext.fsGroup that lets the non-root
+            # container process read them.
+            defaultMode: 0440
         {{- if eq .Values.issuance.mode "InternalCa" }}
         - name: ca
           secret:
             secretName: {{ required "issuance.internalCa.existingSecret is required in InternalCa mode" .Values.issuance.internalCa.existingSecret }}
-            defaultMode: 0400
+            # Group-readable, not just owner-readable: the mounted files are owned by root, and
+            # it's group membership via podSecurityContext.fsGroup that lets the non-root
+            # container process read them.
+            defaultMode: 0440
         {{- end }}
         {{- if eq .Values.issuance.mode "HttpDelegate" }}
         {{- if .Values.issuance.httpDelegate.credentialsSecret.existingSecret }}
         - name: upstream
           secret:
             secretName: {{ .Values.issuance.httpDelegate.credentialsSecret.existingSecret }}
-            defaultMode: 0400
+            # Group-readable, not just owner-readable: the mounted files are owned by root, and
+            # it's group membership via podSecurityContext.fsGroup that lets the non-root
+            # container process read them.
+            defaultMode: 0440
         {{- end }}
         - name: upstream-chain
           configMap:
@@ -116,7 +125,10 @@ spec:
         - name: client-trust
           secret:
             secretName: {{ .Values.authentication.clientCertificateTrustStore.existingSecret }}
-            defaultMode: 0400
+            # Group-readable, not just owner-readable: the mounted files are owned by root, and
+            # it's group membership via podSecurityContext.fsGroup that lets the non-root
+            # container process read them.
+            defaultMode: 0440
         {{- end }}
         - name: tmp
           emptyDir: {}

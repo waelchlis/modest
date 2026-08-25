@@ -3,6 +3,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+# Extra trust anchors for networks that intercept outbound TLS (see docker/ca-certificates/README.md
+# and planning/STATUS.md) — empty by default, so this is a no-op everywhere else. Must run before
+# `dotnet restore` reaches out to nuget.org, or an intercepting proxy's substituted certificate fails
+# as NU1301 UntrustedRoot.
+COPY docker/ca-certificates/ /usr/local/share/ca-certificates/extra/
+RUN update-ca-certificates
+
 # Restore against the manifests alone so the layer caches across source edits.
 COPY global.json Directory.Build.props Directory.Packages.props Modest.slnx ./
 COPY src/Modest.Core/Modest.Core.csproj                             src/Modest.Core/

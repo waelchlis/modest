@@ -13,3 +13,10 @@ artifacts/
 *.pfx
 *.key
 !tests/**/testdata/**/*.pfx
+
+# Environment-specific build-time trust anchors (see docker/ca-certificates/README.md) — never a
+# repo default, since baking one network's interception CA into the image would silently make every
+# build trust it.
+docker/ca-certificates/*
+!docker/ca-certificates/.gitkeep
+!docker/ca-certificates/README.md

@@ -32,6 +32,11 @@ podSecurityContext:
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
+  # Secret volumes are mounted owned by root with this as the group; without it, the container's
+  # non-root process (uid 1654, the "app" user baked into the .NET chiselled image by
+  # docker/Dockerfile's `USER $APP_UID`) cannot read the TLS/CA secrets at all, and the pod
+  # crash-loops on startup. Must match that image's UID:GID if the base image ever changes.
+  fsGroup: 1654
 
 securityContext:
   allowPrivilegeEscalation: false

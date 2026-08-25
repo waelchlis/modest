@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -89,7 +90,12 @@ public sealed class HttpDelegateIssuer : ICertificateIssuer, IDisposable
                 IssuanceRejectionKind.InvalidCsr);
         }
 
-        var payload = new IssuanceApiRequest(Convert.ToBase64String(request.Pkcs10Der.Span));
+        // The wire contract is base64 of PEM text (confirmed against the real upstream, see
+        // 09-open-questions.md #1), not base64 of the raw DER — the CSR is re-encoded to PEM here
+        // rather than forwarding whatever line-wrapping the EST client's own base64 body happened
+        // to use, so the upstream always sees one canonical form.
+        string pem = PemEncoding.WriteString("CERTIFICATE REQUEST", request.Pkcs10Der.Span);
+        var payload = new IssuanceApiRequest(Convert.ToBase64String(Encoding.ASCII.GetBytes(pem)));
 
         HttpResponseMessage response;
         try

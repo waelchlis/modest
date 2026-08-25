@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.idea/
+**/TestResults/
+coverage*/
+*.trx
+artifacts/
+helm/
+tests/
+planning/

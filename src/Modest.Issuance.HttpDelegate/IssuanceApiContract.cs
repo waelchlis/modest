@@ -6,7 +6,9 @@ namespace Modest.Issuance.HttpDelegate;
 /// Request body sent to the upstream issuance API.
 /// </summary>
 /// <param name="Csr">
-/// Base64 of the raw DER PKCS#10 bytes, unwrapped.
+/// Base64 of the PEM-encoded PKCS#10 request (i.e. base64 of the full
+/// <c>-----BEGIN CERTIFICATE REQUEST-----</c> text, not of the raw DER bytes underneath it) — see
+/// 09-open-questions.md #1.
 /// </param>
 /// <remarks>
 /// This is re-encoded from the decoded DER rather than forwarding the EST request body verbatim.
