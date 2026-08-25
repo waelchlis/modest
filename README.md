@@ -1,5 +1,8 @@
 # Modest
 
+[![Build and test](https://github.com/waelchlis/modest/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/waelchlis/modest/actions/workflows/build-and-test.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
 A modular EST server — [RFC 7030](https://www.rfc-editor.org/rfc/rfc7030), Enrollment over Secure Transport — written in .NET 10.
 
 Modest separates the EST protocol from certificate issuance. The HTTP layer never touches a CA key; it talks to an `ICertificateIssuer`. Two implementations ship:
@@ -10,6 +13,15 @@ Modest separates the EST protocol from certificate issuance. The HTTP layer neve
 That second mode is the point of the project. Most organisations already have a CA — ADCS, EJBCA, Vault, something bespoke — and want EST as a protocol front door onto it rather than another place a private key lives.
 
 ## Status
+
+438 automated tests pass across five projects (codec, both issuers, the HTTP surface run against
+both issuance modes, and an [RFC 7030 traceability suite](planning/06-testing-strategy.md#6-rfc-compliance-test-matrix-traceability)
+tying tests back to specific sections of the spec). Beyond `dotnet test`, the server has been driven
+by real `openssl`/`curl` clients, built and run as the actual Docker image (not just linted), and
+deployed with `helm install` against a real Kubernetes cluster — enrollment, re-enrollment, `/cacerts`,
+and listener isolation all verified end to end at each of those layers. See
+[planning/STATUS.md](planning/STATUS.md) for the detailed, dated handoff log, including defects found
+along the way and how each was fixed.
 
 | Operation | Path | Status |
 |---|---|---|
@@ -48,7 +60,7 @@ openssl req -in dev.csr -outform DER | base64 -w0 > dev.b64
 ```
 
 ```bash
-curl -sk -u device:s3cret -X POST https://127.0.0.1:8443/.well-known/est/simpleenroll -H "Content-Type: application/pkcs10" --data-binary @dev.b64 | base64 -d | openssl pkcs7 -inform DER -print_certs
+curl -sk -u device:s3cret -X POST https://127.0.0.1:8443/.well-known/est/simpleenroll -H "Content-Type: application/pkcs10" --data-binary @dev.b64 | base64 -d | openssl pkcs7 -inform DER -print_certs -out dev-cert.pem
 ```
 
 Fetching the CA chain needs no credentials at all — that is the bootstrap case RFC 7030 designs for:
@@ -56,6 +68,37 @@ Fetching the CA chain needs no credentials at all — that is the bootstrap case
 ```bash
 curl -sk https://127.0.0.1:8443/.well-known/est/cacerts | base64 -d | openssl pkcs7 -inform DER -print_certs -noout
 ```
+
+## Renewing a certificate — re-enroll
+
+`/simplereenroll` is how a client with an already-issued certificate gets a fresh one before the old
+one expires, without an operator handing out credentials again. Continuing the walkthrough above,
+`dev-cert.pem` and `dev.key` are the certificate and key from that first enrollment.
+
+Build a new CSR requesting **the same subject and the same SANs** — reusing the existing key is the
+usual case for a renewal, but a fresh key works too, since it's the identity being renewed, not the
+key:
+
+```bash
+openssl req -new -key dev.key -out dev-renew.csr \
+  -subj "/CN=device01.example.com" -addext "subjectAltName=DNS:device01.example.com,IP:10.0.0.5"
+openssl req -in dev-renew.csr -outform DER | base64 -w0 > dev-renew.b64
+```
+
+Authenticate the re-enrollment with the certificate being renewed — a TLS client certificate, not
+Basic auth (see [Re-enrollment identity checking](#re-enrollment-identity-checking) below for why).
+This needs `Authentication:ClientCertificateTrustStorePath` pointed at the issuing CA (`ca.crt` from
+`init-ca`); without it, client certificates fall back to the platform trust store, which a
+just-issued device certificate won't be in, and the request 401s:
+
+```bash
+curl -sk --cert dev-cert.pem --key dev.key -X POST https://127.0.0.1:8443/.well-known/est/simplereenroll \
+  -H "Content-Type: application/pkcs10" --data-binary @dev-renew.b64 \
+  | base64 -d | openssl pkcs7 -inform DER -print_certs -out dev-cert.pem
+```
+
+The response is the same certs-only PKCS#7 shape as `/simpleenroll`. `dev-cert.pem` is overwritten in
+place, ready for the next renewal.
 
 ## Quickstart — HTTP delegated issuance
 
@@ -175,4 +218,4 @@ Full design and rationale live in [planning/](planning/): protocol reference, ar
 
 ## License
 
-TODO: choose a license.
+[GNU General Public License v3.0](LICENSE).
