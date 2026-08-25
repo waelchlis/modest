@@ -88,11 +88,10 @@ public sealed class FakeUpstreamCa : IDisposable
     private static string IssueForRequest(IRequestMessage request)
     {
         using var document = JsonDocument.Parse(request.Body!);
-        string base64 = document.RootElement.GetProperty("CSR").GetString()!;
+        string pem = document.RootElement.GetProperty("CSR").GetString()!;
 
-        // The wire contract is base64 of PEM text, not base64 of the raw DER underneath it (see
-        // planning/09-open-questions.md #1) — decode one layer further than the field itself.
-        string pem = System.Text.Encoding.ASCII.GetString(Convert.FromBase64String(base64));
+        // The wire contract is the PEM text itself, not base64 of it and not the raw DER
+        // underneath it (see planning/09-open-questions.md #1).
         PemFields fields = PemEncoding.Find(pem);
         byte[] der = Convert.FromBase64String(pem[fields.Base64Data]);
 

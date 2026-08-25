@@ -32,10 +32,12 @@ Returns the configured chain: the CA cert itself plus any configured intermediat
 
 Request (`POST {BaseAddress}{IssuePath}`):
 ```json
-{ "CSR": "<base64 of the PEM-encoded PKCS#10 request>" }
+{ "CSR": "-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----\n" }
 ```
 
-Confirmed against the real upstream (see [09-open-questions.md](09-open-questions.md) #1): the field is base64 of the *PEM text* — `-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----\n`, itself base64 — not base64 of the raw DER underneath it. The EST client's own `/simpleenroll` body is *not* reused verbatim (that body may contain whitespace/line-wraps and uses `Content-Transfer-Encoding: base64` framing) — Modest re-encodes the already-decoded DER bytes to a fresh, canonically-wrapped PEM and base64s that, so the upstream always sees one canonical form regardless of what the EST client sent.
+Confirmed against the real upstream (see [09-open-questions.md](09-open-questions.md) #1, revised after initial testing against the real service): the field is the *PEM text itself* — not base64 of it, and not the raw DER underneath it. The EST client's own `/simpleenroll` body is *not* reused verbatim (that body may contain whitespace/line-wraps and uses `Content-Transfer-Encoding: base64` framing) — Modest re-encodes the already-decoded DER bytes to a fresh, canonically-wrapped PEM, so the upstream always sees one canonical form regardless of what the EST client sent.
+
+Sent as a buffered request body with an explicit `Content-Length` (not streamed via chunked transfer-encoding) — a classic `System.Web.Http` upstream was observed receiving the full byte count at the transport level but failing to bind the model when the request had no declared length.
 
 Expected response (`200 OK`, `application/json`):
 ```json

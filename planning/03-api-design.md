@@ -76,7 +76,7 @@ These are internal to that project (not part of the public EST wire contract) â€
 
 ```json
 // Request body Modest sends to the external issuance API
-{ "CSR": "<base64 of the PEM-encoded CSR>" }
+{ "CSR": "<PEM-encoded CSR, i.e. the literal -----BEGIN CERTIFICATE REQUEST----- text>" }
 ```
 ```json
 // Response body Modest expects back

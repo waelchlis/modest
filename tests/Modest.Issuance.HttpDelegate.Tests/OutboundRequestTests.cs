@@ -15,6 +15,12 @@ namespace Modest.Issuance.HttpDelegate.Tests;
 /// </remarks>
 public sealed class OutboundRequestTests
 {
+    /// <summary>Mirrors HttpDelegateIssuer's private OutboundJson options.</summary>
+    private static readonly JsonSerializerOptions RelaxedJson = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     [Fact]
     public async Task Body_carries_exactly_one_property_named_CSR_in_that_casing()
     {
@@ -32,32 +38,32 @@ public sealed class OutboundRequestTests
     public async Task Body_is_the_canonical_unescaped_JSON_form()
     {
         // The default JavaScriptEncoder escapes '+' (HTML-embedding armour an API payload that will
-        // never touch HTML doesn't need), which is why OutboundJson opts out of it. Under the old
-        // raw-DER contract that mattered directly: base64 of arbitrary DER bytes contains '+' with
-        // near certainty. Under the current base64-of-PEM contract it can't be provoked through a
-        // real CSR at all -- every byte in PEM's own character set has its top bits pinned such that
-        // none of the four base64 output groups per input triplet can land on 62/63 ('+'/'/'), so
-        // this field structurally never contains either character now. The exact-match assertion
-        // below still guards the byte-for-byte contract; it just can't exercise that specific
-        // escaping path any more.
-        byte[] der = CsrFactory.CreateRsa("CN=encoder-check.example.com");
-        string expectedBase64 = Convert.ToBase64String(Encoding.ASCII.GetBytes(ExpectedPem(der)));
+        // never touch HTML doesn't need), which is why OutboundJson opts out of it. The PEM text is
+        // sent as the literal JSON string value (see 09-open-questions.md #1), so its base64 payload
+        // lines — which contain '+' with near certainty for any real CSR — are directly visible on
+        // the wire, not hidden behind an outer encoding layer. This is a real, exercisable escaping
+        // path, unlike the double-base64 contract this replaced.
+        byte[] der = CsrWithPlusInItsPem();
+        string pem = ExpectedPem(der);
+        pem.Contains('+', StringComparison.Ordinal)
+            .ShouldBeTrue("this guard is only meaningful for a CSR whose PEM exercises '+'");
 
         using var harness = IssuerHarness.Create();
         harness.StubSuccess(SharedPki.Leaf.ExportCertificatePem(), SharedPki.Ca.ChainPem());
 
         await harness.Issuer.IssueAsync(SharedPki.RequestFor(der), CancellationToken.None);
 
-        harness.SingleRequestBody().ShouldBe($"{{\"CSR\":\"{expectedBase64}\"}}");
+        string expectedJsonValue = JsonSerializer.Serialize(pem, RelaxedJson);
+        harness.SingleRequestBody().ShouldBe($"{{\"CSR\":{expectedJsonValue}}}");
     }
 
     [Fact]
-    public async Task Base64_decodes_to_pem_wrapping_exactly_the_DER_bytes_that_went_in()
+    public async Task Csr_field_is_the_pem_text_wrapping_exactly_the_DER_bytes_that_went_in()
     {
         // The whole point of IssuanceRequest carrying bytes rather than a parsed object is that no
         // re-encoding drift can creep in between the EST client and the upstream. This asserts it,
-        // for the PEM contract confirmed in 09-open-questions.md #1 — base64 of PEM text, not base64
-        // of the raw DER underneath it.
+        // for the PEM contract confirmed in 09-open-questions.md #1 — the field is the PEM text
+        // itself, not base64 of it and not the raw DER underneath it.
         byte[] der = CsrFactory.CreateEcdsa("CN=drift-check.example.com", dnsNames: ["drift-check.example.com"]);
 
         using var harness = IssuerHarness.Create();
@@ -66,34 +72,14 @@ public sealed class OutboundRequestTests
         await harness.Issuer.IssueAsync(SharedPki.RequestFor(der), CancellationToken.None);
 
         using JsonDocument document = JsonDocument.Parse(harness.SingleRequestBody());
-        string encoded = document.RootElement.GetProperty("CSR").GetString()!;
+        string pem = document.RootElement.GetProperty("CSR").GetString()!;
 
-        string pem = Encoding.ASCII.GetString(Convert.FromBase64String(encoded));
         pem.ShouldBe(ExpectedPem(der));
+        pem.ShouldStartWith("-----BEGIN CERTIFICATE REQUEST-----");
 
         PemFields fields = PemEncoding.Find(pem);
         byte[] roundTripped = Convert.FromBase64String(pem[fields.Base64Data]);
         roundTripped.SequenceEqual(der).ShouldBeTrue("the DER handed to the issuer must reach the upstream unchanged");
-    }
-
-    [Fact]
-    public async Task Outer_base64_is_a_single_unwrapped_line()
-    {
-        // The PEM text inside legitimately contains newlines and "-----BEGIN ..." (that's the point
-        // of the contract, see 09-open-questions.md #1) — what must stay unwrapped is the outer
-        // base64 envelope itself, since that is what a hand-rolled JSON parser on the other end has
-        // to consume as one opaque string.
-        using var harness = IssuerHarness.Create();
-        harness.StubSuccess(SharedPki.Leaf.ExportCertificatePem(), SharedPki.Ca.ChainPem());
-
-        await harness.Issuer.IssueAsync(SharedPki.Request(), CancellationToken.None);
-
-        using JsonDocument document = JsonDocument.Parse(harness.SingleRequestBody());
-        string encoded = document.RootElement.GetProperty("CSR").GetString()!;
-
-        encoded.ShouldNotContain("\n");
-        encoded.ShouldNotContain("\r");
-        encoded.ShouldNotContain(" ");
     }
 
     [Fact]
@@ -157,8 +143,25 @@ public sealed class OutboundRequestTests
         harness.SingleRequestHeader("Authorization").ShouldBeNull();
     }
 
-    /// <summary>The PEM text the issuer is expected to send, before the outer base64 wrap.</summary>
+    /// <summary>The PEM text the issuer is expected to send as the CSR field's value.</summary>
     private static string ExpectedPem(byte[] der) => PemEncoding.WriteString("CERTIFICATE REQUEST", der);
+
+    private static byte[] CsrWithPlusInItsPem()
+    {
+        // PEM's base64 payload lines contain '+' with overwhelming probability for a ~1200-byte
+        // CSR, but "overwhelming" is not "always", and a guard that silently stops guarding is
+        // worse than no guard.
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            byte[] der = CsrFactory.CreateRsa("CN=encoder-check.example.com");
+            if (ExpectedPem(der).Contains('+', StringComparison.Ordinal))
+            {
+                return der;
+            }
+        }
+
+        throw new InvalidOperationException("Could not generate a CSR whose PEM contains '+'.");
+    }
 
     private static async Task<string> CaptureAuthorizationHeaderAsync(bool trailingNewline)
     {
