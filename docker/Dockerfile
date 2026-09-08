@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:4beef5b8919dcaa2dc924233bd069257e883cc7a061e09088a97d152d6a48510 AS build
 WORKDIR /src
 
 # Extra trust anchors for networks that intercept outbound TLS (see docker/ca-certificates/README.md
@@ -26,7 +26,7 @@ RUN dotnet publish src/Modest.Server/Modest.Server.csproj -c Release -o /app/ser
  && dotnet publish src/Modest.Tooling/Modest.Tooling.csproj -c Release -o /app/tooling --no-restore
 
 # Chiselled runtime: no shell and no package manager, and it runs as a non-root user by default.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled@sha256:0839314d08bb65da369135389a5d8291f75ace587fbb0488f469eb92c62eef68 AS runtime
 WORKDIR /app
 
 COPY --from=build /app/server ./
