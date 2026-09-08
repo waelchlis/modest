@@ -1,4 +1,4 @@
-# Modest
+# ModEST
 
 [![Build and test](https://github.com/waelchlis/modest/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/waelchlis/modest/actions/workflows/build-and-test.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
