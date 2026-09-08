@@ -1,0 +1,63 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "UTC",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "prConcurrentLimit": 4,
+  "prHourlyLimit": 0,
+  "labels": [
+    "dependencies"
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": [
+      "at any time"
+    ],
+    "labels": [
+      "security"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Group all NuGet minor/patch bumps into one PR, auto-merge once CI passes",
+      "matchManagers": ["nuget"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "NuGet dependencies (non-major)",
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Major NuGet bumps get their own PR, no auto-merge (crypto/PKI-sensitive code)",
+      "matchManagers": ["nuget"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "NuGet major updates",
+      "automerge": false
+    },
+    {
+      "description": "Group Docker base image digest/tag bumps",
+      "matchManagers": ["dockerfile"],
+      "groupName": "Docker base images",
+      "pinDigests": true,
+      "automerge": false
+    },
+    {
+      "description": "Group GitHub Actions bumps and auto-merge minor/patch",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": ".NET SDK version in global.json — review manually, don't auto-merge",
+      "matchManagers": ["nuget"],
+      "matchFileNames": ["global.json"],
+      "groupName": ".NET SDK",
+      "automerge": false
+    }
+  ]
+}
